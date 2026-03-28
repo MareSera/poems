@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诗集</title>
+    <style>
+        @font-face {
+            font-family: 'KeinannMaruPOP-CN';
+            src: url('assets/fonts/KeinannMaruPOP-CN.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+4E00-9FFF, U+3400-4DBF, U+20000-2A6DF, U+2A700-2B73F, U+2B740-2B81F, U+2B820-2CEAF, U+F900-FAFF, U+2F800-2FA1F;
+        }
+
+        @font-face {
+            font-family: 'KeinannMaruPOP-JP';
+            src: url('assets/fonts/KeinannMaruPOP-JP.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+3040-309F, U+30A0-30FF, U+31F0-31FF, U+3200-32FF, U+3300-33FF, U+FF00-FFEF;
+        }
+
+        :root {
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --btn-bg: #2a2a2a;
+            --btn-text: #ffffff;
+            --btn-hover: #000000;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --card-bg: #2a2a2a;
+            --text-primary: #f5f5f5;
+            --text-secondary: #a0a0a0;
+            --border-color: #404040;
+            --btn-bg: #f5f5f5;
+            --btn-text: #1a1a1a;
+            --btn-hover: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'KeinannMaruPOP-CN', 'KeinannMaruPOP-JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Hiragino Sans GB', 'Microsoft YaHei', 'Hiragino Kaku Gothic Pro', 'Meiryo', sans-serif;
+            background: var(--bg-color);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 0.3s ease;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            width: 48px;
+            height: 48px;
+            border: 2px solid var(--text-primary);
+            border-radius: 50%;
+            background: var(--card-bg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--text-primary);
+            transform: rotate(180deg);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .theme-toggle svg {
+            width: 22px;
+            height: 22px;
+            fill: none;
+            stroke: var(--text-primary);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .fatal-error {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            font-size: 20px;
+            gap: 16px;
+        }
+
+        .book-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            width: 95vw;
+            max-width: 1100px;
+        }
+
+        /* ===== 书本容器 ===== */
+        .book {
+            display: flex;
+            width: 100%;
+            min-height: 70vh;
+            max-height: 80vh;
+            position: relative;
+            perspective: 2500px;
+            perspective-origin: 50% 50%;
+        }
+
+        /* 书本底部阴影 */
+        .book::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 4%;
+            right: 4%;
+            height: 20px;
+            background: radial-gradient(ellipse at center, rgba(0,0,0,0.25) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* ===== 页面包装器 ===== */
+        .page-wrapper {
+            flex: 1;
+            position: relative;
+            transform-style: preserve-3d;
+            /* 默认不旋转 */
+        }
+
+        .left-page-wrapper  { transform-origin: right center; }
+        .right-page-wrapper { transform-origin: left center; }
+
+        /* ===== 实际页面 ===== */
+        .left-page, .right-page {
+            position: absolute;
+            inset: 0;
+            padding: 48px 40px;
+            overflow-y: auto;
+            background: var(--card-bg);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .left-page {
+            border-radius: 16px 0 0 16px;
+            border: 1px solid var(--border-color);
+            border-right: none;
+            box-shadow: inset -6px 0 16px rgba(0,0,0,0.07);
+        }
+
+        .right-page {
+            border-radius: 0 16px 16px 0;
+            border: 1px solid var(--border-color);
+            border-left: none;
+            box-shadow: inset 6px 0 16px rgba(0,0,0,0.07);
+        }
+
+        /* 书脊 */
+        .book-spine {
+            width: 8px;
+            flex-shrink: 0;
+            background: linear-gradient(to right,
+                rgba(0,0,0,0.12) 0%,
+                rgba(255,255,255,0.15) 40%,
+                rgba(0,0,0,0.10) 100%
+            );
+            position: relative;
+            z-index: 20;
+        }
+
+        [data-theme="dark"] .book-spine {
+            background: linear-gradient(to right,
+                rgba(0,0,0,0.4) 0%,
+                rgba(255,255,255,0.05) 40%,
+                rgba(0,0,0,0.3) 100%
+            );
+        }
+
+        .page-content { height: 100%; }
+
+        /* ===== 入场动画 ===== */
+        .book.book-closed .left-page-wrapper  { transform: rotateY(90deg); }
+        .book.book-closed .right-page-wrapper { transform: rotateY(-90deg); }
+
+        .book.book-opening .left-page-wrapper {
+            animation: openLeft 1s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+        }
+        .book.book-opening .right-page-wrapper {
+            animation: openRight 1s cubic-bezier(0.23, 1, 0.32, 1) 0.05s forwards;
+        }
+
+        @keyframes openLeft {
+            0%   { transform: rotateY(88deg); }
+            65%  { transform: rotateY(-6deg); }
+            82%  { transform: rotateY(2deg); }
+            100% { transform: rotateY(0deg); }
+        }
+        @keyframes openRight {
+            0%   { transform: rotateY(-88deg); }
+            65%  { transform: rotateY(6deg); }
+            82%  { transform: rotateY(-2deg); }
+            100% { transform: rotateY(0deg); }
+        }
+
+        /* ===== 翻页纸（flying page）===== */
+        /* 单面翻页纸：只有一个面，JS 在翻到 90° 时切换内容和样式 */
+        .flying-page {
+            position: absolute;
+            top: 0;
+            z-index: 50;
+            pointer-events: none;
+            background: var(--card-bg);
+            overflow: hidden;
+            /* 翻页纸的过渡由 JS 用 requestAnimationFrame 驱动，不用 CSS animation */
+        }
+
+        .flying-page.is-front {
+            border-radius: 0 16px 16px 0;
+            border: 1px solid var(--border-color);
+            border-left: none;
+            box-shadow: inset 6px 0 16px rgba(0,0,0,0.07),
+                        -4px 0 12px rgba(0,0,0,0.08);
+        }
+
+        .flying-page.is-back {
+            border-radius: 16px 0 0 16px;
+            border: 1px solid var(--border-color);
+            border-right: none;
+            box-shadow: inset -6px 0 16px rgba(0,0,0,0.07),
+                        4px 0 12px rgba(0,0,0,0.08);
+        }
+
+        .flying-page-content {
+            padding: 48px 40px;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* ===== 导航栏 ===== */
+        .book-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .toc-collection-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 24px 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border-color);
+            letter-spacing: 1px;
+            transition: color 0.2s ease;
+        }
+
+        .toc-collection-title:hover {
+            color: var(--text-secondary);
+        }
+
+        .toc-collection-title:first-child {
+            margin-top: 0;
+        }
+
+        .toc-entry {
+            padding: 10px 12px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 15px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .toc-entry:hover {
+            background: var(--text-primary);
+            color: var(--card-bg);
+            transform: translateX(4px);
+        }
+
+        .page-info {
+            color: var(--text-secondary);
+            font-size: 14px;
+            letter-spacing: 1px;
+            flex: 1;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 12px;
+        }
+
+        .nav-btn {
+            width: 44px;
+            height: 44px;
+            border: 2px solid var(--text-primary);
+            border-radius: 50%;
+            background: var(--card-bg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: var(--text-primary);
+            color: var(--card-bg);
+            transform: scale(1.1);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .nav-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .nav-btn:hover:not(:disabled) svg {
+            stroke: var(--card-bg);
+        }
+
+        /* ===== 首页 ===== */
+        .home-left {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0;
+        }
+
+        .home-site-title {
+            font-size: 13px;
+            color: var(--text-secondary);
+            letter-spacing: 3px;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+
+        .home-main-title {
+            font-size: 38px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 4px;
+            line-height: 1.3;
+            margin-bottom: 8px;
+        }
+
+        .home-author {
+            font-size: 15px;
+            color: var(--text-secondary);
+            letter-spacing: 2px;
+            margin-bottom: 32px;
+        }
+
+        .home-divider {
+            width: 40px;
+            height: 2px;
+            background: var(--border-color);
+            margin-bottom: 28px;
+        }
+
+        .home-desc {
+            font-size: 14px;
+            line-height: 2.2;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        .home-right {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 32px;
+        }
+
+        .home-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--border-color);
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .home-avatar:hover {
+            border-color: var(--text-secondary);
+            transform: scale(1.05);
+        }
+
+        .home-avatar-placeholder {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 40px;
+        }
+
+        .home-random-btn {
+            padding: 12px 28px;
+            border: 2px solid var(--text-primary);
+            border-radius: 24px;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .home-random-btn:hover {
+            background: var(--text-primary);
+            color: var(--card-bg);
+        }
+
+        /* 左上角固定按钮组 */
+        .fixed-left-btns {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 200;
+        }
+
+        /* ===== 诗歌页 ===== */
+        .poem-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 28px;
+            line-height: 1.4;
+            letter-spacing: 2px;
+        }
+
+        .poem-content {
+            font-size: 16px;
+            line-height: 2.2;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            letter-spacing: 1px;
+        }
+
+        .poem-loading {
+            color: var(--text-secondary);
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .poem-error {
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+
+        /* 右页：标签在右上，收录信息在右下 */
+        .poem-right-page {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .poem-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .poem-tag {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .poem-collection-block {
+            text-align: right;
+        }
+
+        .poem-collection-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .poem-collection-name {
+            font-size: 36px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 4px;
+            line-height: 1.3;
+        }
+
+        /* ===== 诗集介绍页 ===== */
+        .collection-intro-left {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .collection-intro-title {
+            font-size: 36px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 4px;
+            line-height: 1.4;
+            margin-bottom: 20px;
+            writing-mode: horizontal-tb;
+        }
+
+        .collection-intro-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .collection-intro-tag {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .collection-intro-right {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .collection-intro-desc {
+            font-size: 15px;
+            line-height: 2.2;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        /* 抽屉 */
+        .drawer-toggle {
+            width: 48px;
+            height: 48px;
+            border: 2px solid var(--text-primary);
+            border-radius: 50%;
+            background: var(--card-bg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            color: var(--text-primary);
+        }
+
+        .drawer-toggle:hover {
+            background: var(--text-primary);
+            color: var(--card-bg);
+            transform: scale(1.05);
+        }
+
+        .drawer-toggle:hover svg {
+            stroke: var(--card-bg);
+        }
+
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 300;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .drawer-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 100vh;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border-color);
+            box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+            z-index: 400;
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .drawer.open {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 20px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .drawer-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 2px;
+        }
+
+        .drawer-close {
+            width: 32px;
+            height: 32px;
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .drawer-close:hover {
+            background: var(--text-primary);
+            color: var(--card-bg);
+            border-color: var(--text-primary);
+        }
+
+        .drawer-search {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .drawer-search input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .drawer-search input:focus {
+            border-color: var(--text-primary);
+        }
+
+        .drawer-search input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .drawer-results {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 12px;
+        }
+
+        .drawer-result-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 14px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+
+        .drawer-result-item:hover {
+            background: var(--text-primary);
+            color: var(--card-bg);
+        }
+
+        .drawer-empty {
+            padding: 20px 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .drawer-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .drawer-toc-btn {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--text-primary);
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 1px;
+        }
+
+        .drawer-toc-btn:hover {
+            background: var(--text-primary);
+            color: var(--card-bg);
+        }
+
+        /* ===== 自定义滚动条 ===== */
+        .left-page::-webkit-scrollbar,
+        .right-page::-webkit-scrollbar,
+        .drawer-results::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .left-page::-webkit-scrollbar-track,
+        .right-page::-webkit-scrollbar-track,
+        .drawer-results::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .left-page::-webkit-scrollbar-thumb,
+        .right-page::-webkit-scrollbar-thumb,
+        .drawer-results::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
+        .left-page::-webkit-scrollbar-thumb:hover,
+        .right-page::-webkit-scrollbar-thumb:hover,
+        .drawer-results::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Firefox */
+        .left-page,
+        .right-page,
+        .drawer-results {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+
+        /* ===== 移动端 ===== */
+        @media (max-width: 768px) {
+            body {
+                padding: 0;
+                align-items: flex-start;
+            }
+
+            .book-container {
+                width: 100vw;
+                gap: 0;
+                padding: 0;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .book {
+                flex: 1;
+                min-height: 0;
+                max-height: none;
+                perspective: none;
+                /* 移动端不需要 flex row，直接用单页 */
+            }
+
+            /* 移动端只显示左页，右页和书脊隐藏 */
+            .right-page-wrapper,
+            .book-spine {
+                display: none;
+            }
+
+            .left-page-wrapper {
+                position: static;
+                flex: 1;
+                transform: none !important;
+                animation: none !important;
+            }
+
+            .left-page {
+                position: static;
+                inset: auto;
+                padding: 24px 20px 24px;
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+                overflow-y: visible;
+                min-height: 0;
+            }
+
+            /* 移动端翻页纸全宽，用于淡入淡出 */
+            .flying-page {
+                border-radius: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                left: 0 !important;
+                width: 100% !important;
+            }
+
+            .flying-page-content {
+                padding: 24px 20px;
+            }
+
+            /* 目录 */
+            .toc-collection-title {
+                font-size: 16px;
+                margin: 20px 0 8px 0;
+            }
+
+            .toc-entry {
+                padding: 8px 10px;
+                font-size: 14px;
+            }
+
+            /* 诗歌页 */
+            .poem-title {
+                font-size: 22px;
+                margin-bottom: 16px;
+            }
+
+            .poem-content {
+                font-size: 15px;
+                line-height: 2;
+            }
+
+            .poem-mobile-meta {
+                margin-top: 32px;
+                padding-top: 20px;
+                border-top: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .poem-mobile-tags {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .poem-collection-name {
+                font-size: 22px;
+            }
+
+            /* 诗集介绍 */
+            .collection-intro-title {
+                font-size: 28px;
+            }
+
+            .collection-intro-desc {
+                margin-top: 24px;
+                font-size: 14px;
+            }
+
+            /* 首页 */
+            .home-main-title {
+                font-size: 28px;
+            }
+
+            .home-right {
+                margin-top: 32px;
+                padding-top: 24px;
+                border-top: 1px solid var(--border-color);
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                height: auto;
+            }
+
+            .home-avatar {
+                width: 80px;
+                height: 80px;
+            }
+
+            .home-avatar-placeholder {
+                width: 80px;
+                height: 80px;
+                font-size: 28px;
+            }
+
+            /* 抽屉 */
+            .drawer {
+                width: 85vw;
+                max-width: 320px;
+            }
+
+            /* 固定按钮 */
+            .theme-toggle,
+            .drawer-toggle {
+                width: 40px;
+                height: 40px;
+            }
+
+            .fixed-left-btns {
+                top: 16px;
+                left: 16px;
+                gap: 8px;
+            }
+
+            .theme-toggle {
+                top: 16px;
+                right: 16px;
+            }
+
+            /* 导航栏 */
+            .book-nav {
+                padding: 12px 16px;
+                max-width: none;
+                width: 100%;
+                border-top: 1px solid var(--border-color);
+                background: var(--card-bg);
+                position: sticky;
+                bottom: 0;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .left-page {
+                padding: 20px 16px;
+            }
+
+            .flying-page-content {
+                padding: 20px 16px;
+            }
+
+            .poem-title {
+                font-size: 20px;
+            }
+
+            .poem-content {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+        <svg id="sunIcon" viewBox="0 0 24 24" style="display: none;">
+            <circle cx="12" cy="12" r="4"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg id="moonIcon" viewBox="0 0 24 24" style="display: block;">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+    </button>
+
+    <!-- 左上角按钮组 -->
+    <div class="fixed-left-btns">
+        <button class="drawer-toggle" id="drawerToggle" aria-label="打开目录" style="position:static;">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+        </button>
+        <button class="drawer-toggle" id="homeBtn" aria-label="回到首页" style="position:static;">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9,22 9,12 15,12 15,22"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- 抽屉遮罩 -->
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+
+    <!-- 抽屉面板 -->
+    <div class="drawer" id="drawer">
+        <div class="drawer-header">
+            <span class="drawer-title">目录</span>
+            <button class="drawer-close" id="drawerClose" aria-label="关闭">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <div class="drawer-search">
+            <input type="text" id="searchInput" placeholder="搜索诗歌标题..." autocomplete="off"/>
+        </div>
+        <div class="drawer-results" id="searchResults"></div>
+        <div class="drawer-footer">
+            <button class="drawer-toc-btn" id="drawerTocBtn">回到目录页</button>
+        </div>
+    </div>
+
+    <div class="book-container" id="bookContainer">
+        <div class="book" id="book">
+            <div class="page-wrapper left-page-wrapper" id="leftPageWrapper">
+                <div class="left-page" id="leftPage">
+                    <div class="page-content" id="leftContent"></div>
+                </div>
+            </div>
+            <div class="book-spine"></div>
+            <div class="page-wrapper right-page-wrapper" id="rightPageWrapper">
+                <div class="right-page" id="rightPage">
+                    <div class="page-content" id="rightContent"></div>
+                </div>
+            </div>
+        </div>
+        <div class="book-nav" id="bookNav"></div>
+    </div>
+
+    <script>
+        const AppState = {
+            currentView: 'home',
+            currentPoemId: null,
+            currentCollection: null,
+            currentPage: 0,
+            poems: [],
+            collections: [],
+            contentCache: {},
+            drawerOpen: false,
+        };
+
+        function showFatalError(message) {
+            document.body.innerHTML = `
+                <div class="fatal-error">
+                    <span>数据加载失败，请刷新页面</span>
+                </div>
+            `;
+        }
+
+        const isMobile = () => window.innerWidth <= 768;
+
+        const DataStore = {
+            async loadPoems() {
+                try {
+                    const response = await fetch('data/poems.json');
+                    if (!response.ok) throw new Error('fetch failed');
+                    const poems = await response.json();
+                    AppState.poems = poems;
+                    return poems;
+                } catch (e) {
+                    showFatalError('数据加载失败，请刷新页面');
+                }
+            },
+            async loadCollections() {
+                try {
+                    const response = await fetch('data/collections.json');
+                    if (!response.ok) throw new Error('fetch failed');
+                    const collections = await response.json();
+                    AppState.collections = collections;
+                    return collections;
+                } catch (e) {
+                    AppState.collections = [];
+                }
+            },
+            async loadContent(filename) {
+                if (AppState.contentCache[filename] !== undefined) {
+                    return AppState.contentCache[filename];
+                }
+                try {
+                    const response = await fetch(`poems/${filename}.txt`);
+                    if (!response.ok) throw new Error('fetch failed');
+                    const content = await response.text();
+                    AppState.contentCache[filename] = content;
+                    return content;
+                } catch (e) {
+                    return null;
+                }
+            }
+        };
+
+        const AnimationController = {
+            playOpenBook() {
+                sessionStorage.setItem('visited', '1');
+                const book = document.getElementById('book');
+                book.classList.add('book-closed');
+                void book.offsetWidth;
+                book.classList.remove('book-closed');
+                book.classList.add('book-opening');
+                setTimeout(() => book.classList.remove('book-opening'), 1100);
+            },
+
+            skipAnimation() { /* 直接显示 */ },
+
+            /*
+             * 真实书本翻页：
+             * 向左翻（下一页）：右页那张纸绕书脊向左翻转 0° → -180°
+             *   - 正面：旧右页内容
+             *   - 背面：新左页内容（翻过去后落在左侧）
+             *   - 翻页纸起始位置：书脊右侧（右页位置）
+             *   - 翻页纸结束位置：书脊左侧（左页位置）
+             *   - 翻到一半时（90°）更新底层左右页内容
+             *
+             * 向右翻（上一页）：左页那张纸绕书脊向右翻转 -180° → 0°
+             *   - 正面：新右页内容（翻回来后落在右侧）
+             *   - 背面：旧左页内容
+             *   - 翻页纸起始位置：书脊左侧（已翻过去的状态）
+             */
+            playPageTurn(direction, callback) {
+                const book = document.getElementById('book');
+                const HALF = 300;
+
+                const realLeft = document.getElementById('leftContent');
+                const realRight = document.getElementById('rightContent');
+                const oldLeftHTML = realLeft.innerHTML;
+                const oldRightHTML = realRight.innerHTML;
+
+                // callback 在动画开始前执行
+                if (callback) callback();
+
+                // 移动端：淡入淡出
+                if (isMobile()) {
+                    const page = document.getElementById('leftPage');
+                    page.style.transition = 'none';
+                    page.style.opacity = '0';
+                    requestAnimationFrame(() => {
+                        page.style.transition = `opacity ${HALF * 2}ms ease`;
+                        page.style.opacity = '1';
+                        setTimeout(() => { page.style.transition = ''; page.style.opacity = ''; }, HALF * 2 + 50);
+                    });
+                    return;
+                }
+
+                const bookRect = book.getBoundingClientRect();
+                const spineEl = book.querySelector('.book-spine');
+                const spineRect = spineEl.getBoundingClientRect();
+                const pageW = (bookRect.width - spineRect.width) / 2;
+                const pageH = bookRect.height;
+                const spineLeft = spineRect.left - bookRect.left + spineRect.width;
+
+                const easeIn  = t => t * t * t;
+                const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+                if (direction === 'left') {
+                    const mask = document.createElement('div');
+                    mask.className = 'flying-page is-back';
+                    mask.style.cssText = `width:${pageW}px;height:${pageH}px;top:0;left:0;z-index:49;`;
+                    mask.innerHTML = `<div class="flying-page-content">${oldLeftHTML}</div>`;
+                    book.appendChild(mask);
+
+                    const fp = document.createElement('div');
+                    fp.className = 'flying-page is-front';
+                    fp.style.cssText = `width:${pageW}px;height:${pageH}px;top:0;left:${spineLeft}px;transform-origin:left center;`;
+                    const content = document.createElement('div');
+                    content.className = 'flying-page-content';
+                    content.innerHTML = oldRightHTML;
+                    fp.appendChild(content);
+                    book.appendChild(fp);
+
+                    let phase = 'fold';
+                    let startTime = performance.now();
+                    const animate = (now) => {
+                        const elapsed = now - startTime;
+                        if (phase === 'fold') {
+                            const t = Math.min(elapsed / HALF, 1);
+                            fp.style.transform = `scaleX(${1 - easeIn(t)})`;
+                            if (t >= 1) {
+                                fp.classList.remove('is-front');
+                                fp.classList.add('is-back');
+                                fp.style.left = '0px';
+                                fp.style.transformOrigin = 'right center';
+                                content.innerHTML = realLeft.innerHTML;
+                                phase = 'unfold';
+                                startTime = now;
+                            }
+                        } else {
+                            const t = Math.min(elapsed / HALF, 1);
+                            fp.style.transform = `scaleX(${easeOut(t)})`;
+                            if (t >= 1) { fp.remove(); mask.remove(); return; }
+                        }
+                        requestAnimationFrame(animate);
+                    };
+                    requestAnimationFrame(animate);
+
+                } else {
+                    const mask = document.createElement('div');
+                    mask.className = 'flying-page is-front';
+                    mask.style.cssText = `width:${pageW}px;height:${pageH}px;top:0;left:${spineLeft}px;z-index:49;`;
+                    mask.innerHTML = `<div class="flying-page-content">${oldRightHTML}</div>`;
+                    book.appendChild(mask);
+
+                    const fp = document.createElement('div');
+                    fp.className = 'flying-page is-back';
+                    fp.style.cssText = `width:${pageW}px;height:${pageH}px;top:0;left:0;transform-origin:right center;`;
+                    const content = document.createElement('div');
+                    content.className = 'flying-page-content';
+                    content.innerHTML = oldLeftHTML;
+                    fp.appendChild(content);
+                    book.appendChild(fp);
+
+                    let phase = 'fold';
+                    let startTime = performance.now();
+                    const animate = (now) => {
+                        const elapsed = now - startTime;
+                        if (phase === 'fold') {
+                            const t = Math.min(elapsed / HALF, 1);
+                            fp.style.transform = `scaleX(${1 - easeIn(t)})`;
+                            if (t >= 1) {
+                                fp.classList.remove('is-back');
+                                fp.classList.add('is-front');
+                                fp.style.left = `${spineLeft}px`;
+                                fp.style.transformOrigin = 'left center';
+                                content.innerHTML = realRight.innerHTML;
+                                phase = 'unfold';
+                                startTime = now;
+                            }
+                        } else {
+                            const t = Math.min(elapsed / HALF, 1);
+                            fp.style.transform = `scaleX(${easeOut(t)})`;
+                            if (t >= 1) { fp.remove(); mask.remove(); return; }
+                        }
+                        requestAnimationFrame(animate);
+                    };
+                    requestAnimationFrame(animate);
+                }
+            },
+
+            init() {
+                if (sessionStorage.getItem('visited')) {
+                    this.skipAnimation();
+                } else {
+                    this.playOpenBook();
+                }
+            }
+        };
+
+        const HomeRenderer = {
+            render() {
+                const avatarHTML = `<a href="https://www.maresera.top/" target="_blank" rel="noopener" style="display:inline-block;border-radius:50%;"><img class="home-avatar" src="https://blog.maresera.top/profile.png" alt="作者头像" onerror="this.outerHTML='<div class=\\'home-avatar-placeholder\\'>✦</div>'"></a>`;
+                const leftHTML = `
+                    <div class="home-left">
+                        <div class="home-site-title">诗集</div>
+                        <div class="home-main-title">MareSera<br>的诗集</div>
+                        <div class="home-author">MareSera 著</div>
+                        <div class="home-divider"></div>
+                        <div class="home-desc">月光与刀光，皆是诗意。\n我将带你走进——属于我的思想世界</div>
+                        <div class="home-desc">这里还在开发中！部分诗歌还未录入！</div>
+                    </div>
+                `;
+                const rightHTML = `
+                    <div class="home-right">
+                        ${avatarHTML}
+                        <button class="home-random-btn" id="randomPoemBtn">随机一首</button>
+                    </div>
+                `;
+
+                if (isMobile()) {
+                    document.getElementById('leftContent').innerHTML = leftHTML + rightHTML;
+                    document.getElementById('rightContent').innerHTML = '';
+                } else {
+                    document.getElementById('leftContent').innerHTML = leftHTML;
+                    document.getElementById('rightContent').innerHTML = rightHTML;
+                }
+
+                document.getElementById('randomPoemBtn').addEventListener('click', () => {
+                    const poems = AppState.poems;
+                    if (!poems.length) return;
+                    const poem = poems[Math.floor(Math.random() * poems.length)];
+                    navigateToPoem(poem.id, 'left');
+                });
+            },
+
+            renderNav() {
+                const nav = document.getElementById('bookNav');
+                nav.innerHTML = `
+                    <button class="nav-btn" style="visibility:hidden" disabled>
+                        <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+                    </button>
+                    <span class="page-info">MareSera 的诗集</span>
+                    <button class="nav-btn" id="homeTocBtn" aria-label="进入目录">
+                        <svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>
+                    </button>
+                `;
+                document.getElementById('homeTocBtn').addEventListener('click', () => {
+                    navigateToTOC();
+                });
+            }
+        };
+
+        const TOCRenderer = {
+            render() {
+                const poems = AppState.poems;
+                const grouped = new Map();
+                for (const poem of poems) {
+                    if (!grouped.has(poem.collection)) grouped.set(poem.collection, []);
+                    grouped.get(poem.collection).push(poem);
+                }
+
+                const allItems = [];
+                for (const [collection, collPoems] of grouped) {
+                    allItems.push({ type: 'heading', text: collection });
+                    for (const poem of collPoems) {
+                        allItems.push({ type: 'poem', poem });
+                    }
+                }
+
+                document.getElementById('leftContent').innerHTML = this._renderItems(allItems);
+                document.getElementById('rightContent').innerHTML = '';
+            },
+
+            _renderItems(items) {
+                return items.map(item => {
+                    if (item.type === 'heading') {
+                        return `<div class="toc-collection-title" data-collection="${item.text}">${item.text}</div>`;
+                    } else {
+                        return `<div class="toc-entry" data-poem-id="${item.poem.id}">${item.poem.title}</div>`;
+                    }
+                }).join('');
+            }
+        };
+
+        const PoemRenderer = {
+            renderLeft(poem, content) {
+                document.getElementById('leftContent').innerHTML = `
+                    <div class="poem-title">${poem.title}</div>
+                    ${content
+                        ? `<div class="poem-content">${this._escapeHtml(content)}</div>`
+                        : `<div class="poem-loading">加载中...</div>`}
+                    ${isMobile() ? this._mobileMetaHTML(poem) : ''}
+                `;
+            },
+
+            renderRight(poem) {
+                if (isMobile()) {
+                    document.getElementById('rightContent').innerHTML = '';
+                    return;
+                }
+                document.getElementById('rightContent').innerHTML = `
+                    <div class="poem-right-page">
+                        <div class="poem-tags">
+                            ${poem.tags.map(tag => `<span class="poem-tag">${tag}</span>`).join('')}
+                        </div>
+                        <div class="poem-collection-block">
+                            <div class="poem-collection-label">收录于</div>
+                            <div class="poem-collection-name">${poem.collection}</div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            _mobileMetaHTML(poem) {
+                return `
+                    <div class="poem-mobile-meta">
+                        <div class="poem-mobile-tags">
+                            ${poem.tags.map(tag => `<span class="poem-tag">${tag}</span>`).join('')}
+                        </div>
+                        <div class="poem-collection-block">
+                            <div class="poem-collection-label">收录于</div>
+                            <div class="poem-collection-name">${poem.collection}</div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            renderLoading() {
+                document.getElementById('leftContent').innerHTML =
+                    `<div class="poem-loading">加载中...</div>`;
+            },
+
+            updateContent(content) {
+                const el = document.getElementById('leftContent');
+                const title = el.querySelector('.poem-title');
+                const titleHTML = title ? title.outerHTML : '';
+                // 找当前诗歌
+                const poem = AppState.poems.find(p => p.id === AppState.currentPoemId);
+                const metaHTML = (isMobile() && poem) ? this._mobileMetaHTML(poem) : '';
+                el.innerHTML = titleHTML + (content
+                    ? `<div class="poem-content">${this._escapeHtml(content)}</div>`
+                    : `<div class="poem-error">内容加载失败，请稍后重试</div>`) + metaHTML;
+            },
+
+            _escapeHtml(str) {
+                return str
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            },
+
+            renderNav(poemId, poems) {
+                const sorted = [...poems].sort((a, b) => a.id - b.id);
+                const idx = sorted.findIndex(p => p.id === poemId);
+                const poem = sorted[idx];
+                const isFirst = idx === 0;
+                const isLast = idx === sorted.length - 1;
+                // 是否是该诗集的第一首
+                const collectionPoems = sorted.filter(p => p.collection === poem.collection);
+                const isFirstInCollection = collectionPoems[0]?.id === poemId;
+
+                const nav = document.getElementById('bookNav');
+                nav.innerHTML = `
+                    <button class="nav-btn" id="prevPoemBtn" aria-label="上一首">
+                        <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+                    </button>
+                    <span class="page-info">第 ${idx + 1} 首 / 共 ${sorted.length} 首</span>
+                    <button class="nav-btn" id="nextPoemBtn" aria-label="下一首" ${isLast ? 'disabled' : ''}>
+                        <svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>
+                    </button>
+                `;
+
+                document.getElementById('prevPoemBtn').addEventListener('click', () => {
+                    if (isFirstInCollection) {
+                        // 回到该诗集介绍页
+                        navigateToCollection(poem.collection, 'right');
+                    } else {
+                        navigateToPoem(sorted[idx - 1].id, 'right');
+                    }
+                });
+                if (!isLast) {
+                    document.getElementById('nextPoemBtn').addEventListener('click', () => {
+                        navigateToPoem(sorted[idx + 1].id, 'left');
+                    });
+                }
+            }
+        };
+
+        const CollectionRenderer = {
+            render(collection) {
+                const leftHTML = `
+                    <div class="collection-intro-left">
+                        <div class="collection-intro-title">${collection.name}</div>
+                        <div class="collection-intro-tags">
+                            ${collection.tags.map(t => `<span class="collection-intro-tag">${t}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+                const rightHTML = `
+                    <div class="collection-intro-right">
+                        <div class="collection-intro-desc">${collection.description}</div>
+                    </div>
+                `;
+                if (isMobile()) {
+                    document.getElementById('leftContent').innerHTML = leftHTML + rightHTML;
+                    document.getElementById('rightContent').innerHTML = '';
+                } else {
+                    document.getElementById('leftContent').innerHTML = leftHTML;
+                    document.getElementById('rightContent').innerHTML = rightHTML;
+                }
+            },
+
+            renderNav(collectionName) {
+                // 找该诗集第一首诗
+                const firstPoem = AppState.poems.find(p => p.collection === collectionName);
+                const nav = document.getElementById('bookNav');
+                nav.innerHTML = `
+                    <button class="nav-btn" id="collectionBackBtn" aria-label="返回目录">
+                        <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+                    </button>
+                    <span class="page-info">${collectionName}</span>
+                    <button class="nav-btn" id="collectionNextBtn" aria-label="浏览诗集" ${firstPoem ? '' : 'disabled'}>
+                        <svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>
+                    </button>
+                `;
+                document.getElementById('collectionBackBtn').addEventListener('click', () => navigateToTOC());
+                if (firstPoem) {
+                    document.getElementById('collectionNextBtn').addEventListener('click', () => {
+                        navigateToPoem(firstPoem.id, 'left');
+                    });
+                }
+            }
+        };
+
+        // 跳转到首页
+        function navigateToHome(direction = 'right') {
+            AppState.currentView = 'home';
+            AppState.currentPoemId = null;
+            AppState.currentCollection = null;
+            AnimationController.playPageTurn(direction, () => {
+                HomeRenderer.render();
+                HomeRenderer.renderNav();
+            });
+            if (typeof DrawerComponent !== 'undefined') DrawerComponent.close();
+        }
+
+        // 跳转到指定诗歌
+        async function navigateToPoem(poemId, direction = 'left') {
+            AppState.currentView = 'poem';
+            AppState.currentPoemId = poemId;
+
+            const poem = AppState.poems.find(p => p.id === poemId);
+            if (!poem) return;
+
+            AnimationController.playPageTurn(direction, async () => {
+                PoemRenderer.renderLeft(poem, null);
+                PoemRenderer.renderRight(poem);
+                PoemRenderer.renderNav(poemId, AppState.poems);
+                const content = await DataStore.loadContent(poem.filename);
+                PoemRenderer.updateContent(content);
+            });
+        }
+
+        // 跳转到诗集介绍页
+        function navigateToCollection(collectionName, direction = 'left') {
+            AppState.currentView = 'collection';
+            AppState.currentCollection = collectionName;
+            const collection = AppState.collections.find(c => c.name === collectionName);
+            if (!collection) return;
+            AnimationController.playPageTurn(direction, () => {
+                CollectionRenderer.render(collection);
+                CollectionRenderer.renderNav(collectionName);
+            });
+        }
+
+        // 返回目录页
+        function navigateToTOC(direction) {
+            const dir = direction || (AppState.currentView === 'home' ? 'left' : 'right');
+            AppState.currentView = 'toc';
+            AppState.currentPoemId = null;
+            AnimationController.playPageTurn(dir, () => {
+                TOCRenderer.render();
+                renderTOCNav();
+            });
+            if (typeof DrawerComponent !== 'undefined') DrawerComponent.close();
+        }
+
+        const DrawerComponent = {
+            open() {
+                AppState.drawerOpen = true;
+                document.getElementById('drawer').classList.add('open');
+                document.getElementById('drawerOverlay').classList.add('active');
+                // 清空搜索框，显示所有诗歌
+                const input = document.getElementById('searchInput');
+                input.value = '';
+                this.renderResults(AppState.poems);
+                setTimeout(() => input.focus(), 300);
+            },
+
+            close() {
+                AppState.drawerOpen = false;
+                document.getElementById('drawer').classList.remove('open');
+                document.getElementById('drawerOverlay').classList.remove('active');
+            },
+
+            search(query, poems) {
+                if (!query.trim()) return poems;
+                const q = query.toLowerCase();
+                return poems.filter(p => p.title.toLowerCase().includes(q));
+            },
+
+            renderResults(poems) {
+                const container = document.getElementById('searchResults');
+                if (poems.length === 0) {
+                    container.innerHTML = `<div class="drawer-empty">未找到相关诗歌</div>`;
+                    return;
+                }
+                container.innerHTML = poems.map(p =>
+                    `<div class="drawer-result-item" data-poem-id="${p.id}">${p.title}
+                        <span style="font-size:12px;color:var(--text-secondary);margin-left:8px;">${p.collection}</span>
+                    </div>`
+                ).join('');
+            }
+        };
+
+        // 抽屉事件绑定
+        document.getElementById('drawerToggle').addEventListener('click', () => {
+            DrawerComponent.open();
+        });
+
+        document.getElementById('drawerClose').addEventListener('click', () => {
+            DrawerComponent.close();
+        });
+
+        document.getElementById('drawerOverlay').addEventListener('click', () => {
+            DrawerComponent.close();
+        });
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const results = DrawerComponent.search(e.target.value, AppState.poems);
+            DrawerComponent.renderResults(results);
+        });
+
+        document.getElementById('searchResults').addEventListener('click', (e) => {
+            const item = e.target.closest('.drawer-result-item');
+            if (item) {
+                const poemId = parseInt(item.dataset.poemId, 10);
+                if (!isNaN(poemId)) {
+                    DrawerComponent.close();
+                    navigateToPoem(poemId);
+                }
+            }
+        });
+
+        const ThemeManager = {
+            init() {
+                const theme = localStorage.getItem('theme') || 'light';
+                this.apply(theme);
+                this._updateIcon(theme);
+            },
+            toggle() {
+                const current = document.documentElement.getAttribute('data-theme');
+                const next = current === 'light' ? 'dark' : 'light';
+                localStorage.setItem('theme', next);
+                this.apply(next);
+                this._updateIcon(next);
+            },
+            apply(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+            },
+            _updateIcon(theme) {
+                const sunIcon = document.getElementById('sunIcon');
+                const moonIcon = document.getElementById('moonIcon');
+                if (theme === 'dark') {
+                    sunIcon.style.display = 'block';
+                    moonIcon.style.display = 'none';
+                } else {
+                    sunIcon.style.display = 'none';
+                    moonIcon.style.display = 'block';
+                }
+            }
+        };
+
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            ThemeManager.toggle();
+        });
+
+        ThemeManager.init();
+        AnimationController.init();
+
+        // 绑定目录条目点击事件（事件委托）
+        function bindTOCEntryClicks() {
+            document.getElementById('book').addEventListener('click', (e) => {
+                const entry = e.target.closest('.toc-entry');
+                if (entry && AppState.currentView === 'toc') {
+                    const poemId = parseInt(entry.dataset.poemId, 10);
+                    if (!isNaN(poemId)) navigateToPoem(poemId);
+                }
+                const heading = e.target.closest('.toc-collection-title');
+                if (heading && AppState.currentView === 'toc') {
+                    const name = heading.dataset.collection;
+                    if (name) navigateToCollection(name);
+                }
+            });
+        }
+
+        // 渲染目录导航栏
+        function renderTOCNav() {
+            const nav = document.getElementById('bookNav');
+            nav.innerHTML = `
+                <button class="nav-btn" id="tocHomeBtn" aria-label="回到首页">
+                    <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+                </button>
+                <span class="page-info">目录</span>
+                <button class="nav-btn" style="visibility:hidden" disabled>
+                    <svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>
+                </button>
+            `;
+            document.getElementById('tocHomeBtn').addEventListener('click', () => navigateToHome('right'));
+        }
+
+        // 主入口：加载数据并渲染首页
+        async function init() {
+            await Promise.all([DataStore.loadPoems(), DataStore.loadCollections()]);
+            if (AppState.poems.length > 0) {
+                HomeRenderer.render();
+                HomeRenderer.renderNav();
+                bindTOCEntryClicks();
+            }
+        }
+
+        document.getElementById('homeBtn').addEventListener('click', () => {
+            if (AppState.currentView !== 'home') navigateToHome('right');
+        });
+
+        document.getElementById('drawerTocBtn').addEventListener('click', () => {
+            navigateToTOC();
+        });
+
+        init();
+    </script>
+</body>
+</html>

@@ -1073,6 +1073,9 @@
             collections: [],
             contentCache: {},
             drawerOpen: false,
+            tocPages: null,
+            tocPageIndex: 0,
+            tocAllItems: [],
         };
 
         function showFatalError(message) {
@@ -1333,14 +1336,14 @@
         };
 
         const TOCRenderer = {
-            render() {
+            // 构建所有条目（与页面无关）
+            _buildItems() {
                 const poems = AppState.poems;
                 const grouped = new Map();
                 for (const poem of poems) {
                     if (!grouped.has(poem.collection)) grouped.set(poem.collection, []);
                     grouped.get(poem.collection).push(poem);
                 }
-
                 const allItems = [];
                 for (const [collection, collPoems] of grouped) {
                     allItems.push({ type: 'heading', text: collection });
@@ -1348,19 +1351,120 @@
                         allItems.push({ type: 'poem', poem });
                     }
                 }
+                return allItems;
+            },
 
-                document.getElementById('leftContent').innerHTML = this._renderItems(allItems);
-                document.getElementById('rightContent').innerHTML = '';
+            _itemHTML(item) {
+                if (item.type === 'heading') {
+                    return `<div class="toc-collection-title" data-collection="${item.text}">${item.text}</div>`;
+                }
+                return `<div class="toc-entry" data-poem-id="${item.poem.id}">${item.poem.title}</div>`;
+            },
+
+            // 渲染指定页（pageIndex），自动溢出检测后分配左右页
+            render(pageIndex = 0) {
+                if (isMobile()) {
+                    // 移动端：全部放左页，无分页
+                    const allItems = this._buildItems();
+                    document.getElementById('leftContent').innerHTML = allItems.map(i => this._itemHTML(i)).join('');
+                    document.getElementById('rightContent').innerHTML = '';
+                    AppState.tocPages = [allItems];
+                    AppState.tocPageIndex = 0;
+                    return;
+                }
+
+                // 先用已缓存的分页结果（如果有且 pageIndex 在范围内）
+                if (AppState.tocPages && pageIndex < AppState.tocPages.length) {
+                    this._renderPage(pageIndex);
+                    return;
+                }
+
+                // 首次渲染：先把所有条目塞进左页，等 DOM 稳定后做溢出分页
+                const allItems = this._buildItems();
+                AppState.tocAllItems = allItems;
+                AppState.tocPages = null;
+                AppState.tocPageIndex = 0;
+
+                const leftEl = document.getElementById('leftContent');
+                const rightEl = document.getElementById('rightContent');
+                leftEl.innerHTML = allItems.map(i => this._itemHTML(i)).join('');
+                rightEl.innerHTML = '';
+
+                // 等两帧确保布局完成
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    this._paginate(allItems, leftEl, rightEl, pageIndex);
+                }));
+            },
+
+            _paginate(allItems, leftEl, rightEl, targetPage) {
+                const leftPage = document.getElementById('leftPage');
+                const rightPage = document.getElementById('rightPage');
+
+                // 把所有条目逐个填入左页，检测溢出后移到右页，右页溢出后截断
+                const pages = []; // 每个元素是 { left: items[], right: items[] }
+                let remaining = [...allItems];
+
+                while (remaining.length > 0) {
+                    // 填左页
+                    const leftItems = [];
+                    leftEl.innerHTML = '';
+                    for (let i = 0; i < remaining.length; i++) {
+                        leftEl.innerHTML += this._itemHTML(remaining[i]);
+                        if (leftPage.scrollHeight > leftPage.clientHeight) {
+                            // 最后一个放不下，移除
+                            const children = leftEl.children;
+                            if (children.length > 0) children[children.length - 1].remove();
+                            leftItems.push(...remaining.slice(0, i));
+                            remaining = remaining.slice(i);
+                            break;
+                        }
+                        if (i === remaining.length - 1) {
+                            leftItems.push(...remaining);
+                            remaining = [];
+                        }
+                    }
+
+                    // 填右页
+                    const rightItems = [];
+                    rightEl.innerHTML = '';
+                    for (let i = 0; i < remaining.length; i++) {
+                        rightEl.innerHTML += this._itemHTML(remaining[i]);
+                        if (rightPage.scrollHeight > rightPage.clientHeight) {
+                            const children = rightEl.children;
+                            if (children.length > 0) children[children.length - 1].remove();
+                            rightItems.push(...remaining.slice(0, i));
+                            remaining = remaining.slice(i);
+                            break;
+                        }
+                        if (i === remaining.length - 1) {
+                            rightItems.push(...remaining);
+                            remaining = [];
+                        }
+                    }
+
+                    pages.push({ left: leftItems, right: rightItems });
+
+                    // 防止死循环（单个条目比页面还高）
+                    if (leftItems.length === 0 && rightItems.length === 0) break;
+                }
+
+                AppState.tocPages = pages;
+                this._renderPage(targetPage);
+            },
+
+            _renderPage(pageIndex) {
+                const pages = AppState.tocPages;
+                const page = pages[Math.min(pageIndex, pages.length - 1)];
+                AppState.tocPageIndex = pageIndex;
+
+                document.getElementById('leftContent').innerHTML = page.left.map(i => this._itemHTML(i)).join('');
+                document.getElementById('rightContent').innerHTML = page.right.map(i => this._itemHTML(i)).join('');
+
+                renderTOCNav(pageIndex, pages.length);
             },
 
             _renderItems(items) {
-                return items.map(item => {
-                    if (item.type === 'heading') {
-                        return `<div class="toc-collection-title" data-collection="${item.text}">${item.text}</div>`;
-                    } else {
-                        return `<div class="toc-entry" data-poem-id="${item.poem.id}">${item.poem.title}</div>`;
-                    }
-                }).join('');
+                return items.map(i => this._itemHTML(i)).join('');
             }
         };
 
@@ -1560,9 +1664,10 @@
             const dir = direction || (AppState.currentView === 'home' ? 'left' : 'right');
             AppState.currentView = 'toc';
             AppState.currentPoemId = null;
+            // 重置分页缓存，重新计算
+            AppState.tocPages = null;
             AnimationController.playPageTurn(dir, () => {
-                TOCRenderer.render();
-                renderTOCNav();
+                TOCRenderer.render(0);
             });
             if (typeof DrawerComponent !== 'undefined') DrawerComponent.close();
         }
@@ -1687,18 +1792,38 @@
         }
 
         // 渲染目录导航栏
-        function renderTOCNav() {
+        function renderTOCNav(pageIndex, totalPages) {
+            pageIndex = pageIndex ?? AppState.tocPageIndex;
+            totalPages = totalPages ?? (AppState.tocPages ? AppState.tocPages.length : 1);
+            const isFirst = pageIndex === 0;
+            const isLast = pageIndex >= totalPages - 1;
             const nav = document.getElementById('bookNav');
             nav.innerHTML = `
-                <button class="nav-btn" id="tocHomeBtn" aria-label="回到首页">
+                <button class="nav-btn" id="tocPrevBtn" aria-label="上一页">
                     <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
                 </button>
-                <span class="page-info">目录</span>
-                <button class="nav-btn" style="visibility:hidden" disabled>
+                <span class="page-info">${totalPages > 1 ? `目录 ${pageIndex + 1} / ${totalPages}` : '目录'}</span>
+                <button class="nav-btn" id="tocNextBtn" aria-label="下一页" ${isLast ? 'disabled' : ''}>
                     <svg viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>
                 </button>
             `;
-            document.getElementById('tocHomeBtn').addEventListener('click', () => navigateToHome('right'));
+            if (!isFirst) {
+                document.getElementById('tocPrevBtn').addEventListener('click', () => {
+                    AnimationController.playPageTurn('right', () => {
+                        TOCRenderer._renderPage(pageIndex - 1);
+                    });
+                });
+            } else {
+                // 第一页的上一页按钮：回首页（不 disabled，改为可见但指向首页）
+                document.getElementById('tocPrevBtn').addEventListener('click', () => navigateToHome('right'));
+            }
+            if (!isLast) {
+                document.getElementById('tocNextBtn').addEventListener('click', () => {
+                    AnimationController.playPageTurn('left', () => {
+                        TOCRenderer._renderPage(pageIndex + 1);
+                    });
+                });
+            }
         }
 
         // 主入口：加载数据并渲染首页
